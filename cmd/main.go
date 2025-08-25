@@ -36,22 +36,25 @@ func main() {
 		Handler: router,
 	}
 
-	// db, err := repo.NewDB(repo.DatabaseConfig{
-	// 	Driver:                  "mysql",
-	// 	Url:                     "user:password@tcp(127.0.0.1:3306)/your_database_name?charset=utf8mb4&parseTime=true&loc=UTC&tls=false&readTimeout=3s&writeTimeout=3s&timeout=3s&clientFoundRows=true",
-	// 	ConnMaxLifetimeInMinute: 3,
-	// 	MaxOpenConns:            10,
-	// 	MaxIdleConns:            1,
-	// })
+	conf := repo.DatabaseConfig{
+		Driver:                  "mysql",
+		Url:                     "user:pass@tcp(localhost:3306)/mydb?parseTime=true",
+		SchemaPath:              "./schema/mysql_schema.sql",
+		ConnMaxLifetimeInMinute: 10,
+		MaxOpenConns:            10,
+		MaxIdleConns:            5,
+	}
 
-	db, err := repo.NewSQLiteDB(repo.SQLiteConfig{
-		// Path:                  "./app.db", // or ":memory:" for tests
-		Path:                  ":memory:",
-		SchemaPath:            "./schema/schema.sql",
-		ConnMaxLifetimeMinute: 10,
-		MaxOpenConns:          10,
-		MaxIdleConns:          5,
-	})
+	// conf := repo.DatabaseConfig{
+	// 	Driver:                  "sqlite3",
+	// 	Url:                     ":memory:", // or "./app.db"
+	// 	SchemaPath:              "./schema/schema.sql",
+	// 	ConnMaxLifetimeInMinute: 10,
+	// 	MaxOpenConns:            10,
+	// 	MaxIdleConns:            5,
+	// }
+
+	db, err := repo.NewDB(conf)
 	if err != nil {
 		log.Fatalf("failed to new database err=%s\n", err.Error())
 	}
