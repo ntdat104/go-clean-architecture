@@ -1,283 +1,553 @@
+// Package log provides logging functionality for the application
 package logger
 
 import (
-	"errors"
+	"fmt"
 	"os"
-	"sync/atomic"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
+
+	"github.com/ntdat104/go-clean-architecture/config"
+	"github.com/ntdat104/go-clean-architecture/internal/util"
 )
 
-const (
-	// DefaultLogFileSizeInMB Default log file size with Megabyte unit.
-	DefaultLogFileSizeInMB = 512
+// Global logger instances, maintained for compatibility with existing code
+var (
+	Logger        *zap.Logger
+	SugaredLogger *zap.SugaredLogger
 )
 
-var globalLogger atomic.Value
-
-// Level map between string level with zapcore level.
-type Level string
-
-const (
-	// DEBUG logs.
-	DEBUG Level = "DEBUG"
-	// INFO level is the default logging.
-	INFO Level = "INFO"
-	// WARN level logs are more important than Info.
-	WARN Level = "WARN"
-	// ERROR logs are high-priority.
-	ERROR Level = "ERROR"
-	// FATAL log message and then calls os.Exit(1).
-	FATAL Level = "FATAL"
-)
-
-var levelMap = map[Level]zapcore.LevelEnabler{
-	DEBUG: zapcore.DebugLevel,
-	INFO:  zapcore.InfoLevel,
-	WARN:  zapcore.WarnLevel,
-	ERROR: zapcore.ErrorLevel,
-	FATAL: zapcore.FatalLevel,
+// LogContext holds contextual information for structured logging
+type LogContext struct {
+	RequestID string
+	UserID    string
+	TraceID   string
+	SpanID    string
+	Operation string
+	Component string
 }
 
-// Config allows users to configure log level and log file.
-type Config struct {
-	Level         Level
-	FileLogConfig FileLogConfig
+// NewLogContext creates a new log context with default values
+func NewLogContext() *LogContext {
+	return &LogContext{
+		Component: "system",
+	}
 }
 
-// FileLogConfig allows users to configure detail log file such as file path, max size of file, max file to backup,....
-type FileLogConfig struct {
-	IsUseFile  bool
-	FilePath   string
-	MaxSize    int
+// WithRequestID sets the request ID in the log context
+func (c *LogContext) WithRequestID(requestID string) *LogContext {
+	c.RequestID = requestID
+	return c
+}
+
+// WithUserID sets the user ID in the log context
+func (c *LogContext) WithUserID(userID string) *LogContext {
+	c.UserID = userID
+	return c
+}
+
+// WithTraceID sets the trace ID in the log context
+func (c *LogContext) WithTraceID(traceID string) *LogContext {
+	c.TraceID = traceID
+	return c
+}
+
+// WithSpanID sets the span ID in the log context
+func (c *LogContext) WithSpanID(spanID string) *LogContext {
+	c.SpanID = spanID
+	return c
+}
+
+// WithOperation sets the operation name in the log context
+func (c *LogContext) WithOperation(operation string) *LogContext {
+	c.Operation = operation
+	return c
+}
+
+// WithComponent sets the component name in the log context
+func (c *LogContext) WithComponent(component string) *LogContext {
+	c.Component = component
+	return c
+}
+
+// ToFields converts the log context to zap fields
+func (c *LogContext) ToFields() []zap.Field {
+	fields := make([]zap.Field, 0)
+
+	if c.RequestID != "" {
+		fields = append(fields, zap.String("request_id", c.RequestID))
+	}
+
+	if c.UserID != "" {
+		fields = append(fields, zap.String("user_id", c.UserID))
+	}
+
+	if c.TraceID != "" {
+		fields = append(fields, zap.String("trace_id", c.TraceID))
+	}
+
+	if c.SpanID != "" {
+		fields = append(fields, zap.String("span_id", c.SpanID))
+	}
+
+	if c.Operation != "" {
+		fields = append(fields, zap.String("operation", c.Operation))
+	}
+
+	if c.Component != "" {
+		fields = append(fields, zap.String("component", c.Component))
+	}
+
+	return fields
+}
+
+// Options defines the configuration options for the logger
+type Options struct {
+	// Log level
+	Level zapcore.Level
+	// Whether to output to console
+	EnableConsole bool
+	// Whether to output to file
+	EnableFile bool
+	// Whether to enable colored output
+	EnableColor bool
+	// Whether to add caller information
+	EnableCaller bool
+	// Whether to add stack traces
+	EnableStacktrace bool
+	// File configuration, required if EnableFile is true
+	FileConfig *FileConfig
+}
+
+// FileConfig defines the configuration for log files
+type FileConfig struct {
+	// Directory path to save log files
+	SavePath string
+	// Log file name
+	FileName string
+	// Maximum size in MB
+	MaxSize int
+	// Maximum age in days
+	MaxAge int
+	// Whether to use local time
+	LocalTime bool
+	// Whether to compress old log files
+	Compress bool
+	// Maximum number of backup files
 	MaxBackups int
-	MaxAge     int
-	Compress   bool
 }
 
-// NewDefaultConfig returns the default config with INFO level and log to console.
-func NewDefaultConfig() Config {
-	return Config{
-		Level: INFO,
-		FileLogConfig: FileLogConfig{
-			IsUseFile: false,
-		},
-	}
+// AppLogger wraps the zap logger
+type AppLogger struct {
+	zap     *zap.Logger
+	sugar   *zap.SugaredLogger
+	options *Options
 }
 
-// NewProductionConfig returns the production config with INFO level.
-func NewProductionConfig(isUseFile bool, filePath string) Config {
-	// Check if a filePath is provided and if we should use a file for logging.
-	if isUseFile && filePath != "" {
-		// Get the current time.
-		currentTime := time.Now()
-		// Format the time as yyyy-mm-dd.
-		formattedDate := currentTime.Format("2006-01-02")
-		// Construct the final file path with the date.
-		// For example, if filePath is "/var/logs/", the new path will be "/var/logs/2025-08-25.log".
-		filePath = filePath + formattedDate + ".log"
-	}
-
-	return Config{
-		Level: INFO,
-		FileLogConfig: FileLogConfig{
-			IsUseFile:  isUseFile,
-			FilePath:   filePath,
-			MaxSize:    DefaultLogFileSizeInMB,
-			MaxBackups: 0,
-			MaxAge:     0,
-			Compress:   true,
-		},
-	}
-}
-
-// Init creates the global logger that is used everywhere in project with your config.
-func Init(cfg Config) error {
-	if err := validateConfig(cfg); err != nil {
-		return err
-	}
-
-	// Use the new functions to build the components.
-	cores, err := buildCores(cfg)
-	if err != nil {
-		return err
-	}
-	zapOptions := buildZapOptions()
-
-	// Combine cores and create the logger with the options.
-	logger := zap.New(zapcore.NewTee(cores...), zapOptions...)
-	globalLogger.Store(logger)
-
-	return nil
-}
-
-// buildCores constructs and returns a slice of zapcore.Core instances based on the provided configuration.
-// It includes a console core and a file core if file logging is enabled.
-func buildCores(cfg Config) ([]zapcore.Core, error) {
-	var cores []zapcore.Core
-
-	// Create a core for console output.
-	// This core uses a console encoder and always logs at the DebugLevel.
-	consoleEncoder := getConsoleEncoder()
-	consoleSyncer, err := getConsolLogSyncer()
-	if err != nil {
-		return nil, err
-	}
-	cores = append(cores, zapcore.NewCore(consoleEncoder, consoleSyncer, zapcore.DebugLevel))
-
-	// If file logging is enabled in the configuration, create and add a file core.
-	if cfg.FileLogConfig.IsUseFile {
-		fileSyncer, err := getFileLogSyncer(cfg.FileLogConfig)
-		if err != nil {
-			return nil, err
-		}
-		fileEncoder := getFileEncoder()
-		// The file core uses the log level specified in the configuration.
-		cores = append(cores, zapcore.NewCore(fileEncoder, fileSyncer, getLevel(cfg.Level)))
-	}
-
-	return cores, nil
-}
-
-// buildZapOptions returns a slice of zap.Option instances for configuring the logger.
-// It adds options for caller information, stack traces, and skipping a caller frame.
-func buildZapOptions() []zap.Option {
-	return []zap.Option{
-		zap.AddCaller(),
-		zap.AddCallerSkip(1),
-		zap.AddStacktrace(zapcore.ErrorLevel),
-	}
-}
-
-// InitProduction creates the global logger that is used everywhere in project with production config logger.
-func InitProduction(filePath string) error {
-	isUseFile := len(filePath) > 0
-	return Init(NewProductionConfig(isUseFile, filePath))
-}
-
-// Sync flushs any buffered log entries. It should be call before program exit.
-func Sync() error {
-	return getGlobalLog().Sync()
-}
-
-// Debug logs a message at Debug level.
-func Debug(msg string, fields ...zap.Field) {
-	getGlobalLog().Debug(msg, fields...)
-}
-
-// Info logs a message at Info level.
-func Info(msg string, fields ...zap.Field) {
-	getGlobalLog().Info(msg, fields...)
-}
-
-// Error logs a message at Error level.
-func Error(msg string, fields ...zap.Field) {
-	getGlobalLog().Error(msg, fields...)
-}
-
-// Warn logs a message at Warn level.
-func Warn(msg string, fields ...zap.Field) {
-	getGlobalLog().Warn(msg, fields...)
-}
-
-// Fatal logs a message at Fatal level.
-func Fatal(msg string, fields ...zap.Field) {
-	getGlobalLog().Fatal(msg, fields...)
-}
-
-func getGlobalLog() *zap.Logger {
-	return globalLogger.Load().(*zap.Logger)
-}
-
-func setGlobalLog(logger *zap.Logger) {
-	globalLogger.Store(logger)
-}
-
-func validateConfig(cfg Config) error {
-	if len(cfg.Level) == 0 {
-		return errors.New("missing level logger")
-	}
-
-	fileLogCfg := cfg.FileLogConfig
-	if fileLogCfg.IsUseFile && len(fileLogCfg.FilePath) == 0 {
-		return errors.New("file path must be not empty")
-	}
-
-	if fileLogCfg.MaxAge < 0 {
-		return errors.New("MaxAge must be greater than or equal to 0")
-	}
-
-	if fileLogCfg.MaxBackups < 0 {
-		return errors.New("MaxBackups must be greater than or equal to 0")
-	}
-
-	if fileLogCfg.MaxSize < 0 {
-		return errors.New("MaxSize must be greater than or equal to 0")
-	}
-
-	return nil
-}
-
-func getLevel(level Level) zapcore.LevelEnabler {
-	zapLevel, ok := levelMap[level]
-	if !ok {
+// ParseLogLevel converts a string log level to zapcore.Level
+func ParseLogLevel(level string) zapcore.Level {
+	switch strings.ToLower(level) {
+	case "debug":
+		return zapcore.DebugLevel
+	case "info":
+		return zapcore.InfoLevel
+	case "warn", "warning":
+		return zapcore.WarnLevel
+	case "error":
+		return zapcore.ErrorLevel
+	case "dpanic":
+		return zapcore.DPanicLevel
+	case "panic":
+		return zapcore.PanicLevel
+	case "fatal":
+		return zapcore.FatalLevel
+	default:
+		// Default to info level if invalid or empty
 		return zapcore.InfoLevel
 	}
-
-	return zapLevel
 }
 
-// getFileEncoder returns a JSON encoder for file logging.
-func getFileEncoder() zapcore.Encoder {
-	cfg := zap.NewProductionEncoderConfig()
-	cfg.EncodeLevel = zapcore.CapitalLevelEncoder
-	cfg.EncodeTime = zapcore.TimeEncoder(func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
-		enc.AppendString(t.Format("2006-01-02 15:04:05.000"))
-	})
-	return zapcore.NewJSONEncoder(cfg)
+// DefaultOptions returns the default configuration options
+func DefaultOptions() *Options {
+	return &Options{
+		Level:            zapcore.InfoLevel,
+		EnableConsole:    true,
+		EnableFile:       false,
+		EnableColor:      true,
+		EnableCaller:     true,
+		EnableStacktrace: true,
+		FileConfig:       nil,
+	}
 }
 
-// getConsoleEncoder returns a console encoder for colored console output.
-func getConsoleEncoder() zapcore.Encoder {
-	cfg := zap.NewDevelopmentEncoderConfig()
-	cfg.EncodeLevel = zapcore.CapitalColorLevelEncoder
-	cfg.EncodeTime = zapcore.TimeEncoder(func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
-		enc.AppendString(t.Format("2006-01-02 15:04:05.000"))
-	})
-	return zapcore.NewConsoleEncoder(cfg)
+// Option defines a function type for configuring options
+type Option func(*Options)
+
+// WithLevel sets the log level
+func WithLevel(level zapcore.Level) Option {
+	return func(o *Options) {
+		o.Level = level
+	}
 }
 
-func getFileLogSyncer(cfg FileLogConfig) (zapcore.WriteSyncer, error) {
-	if st, err := os.Stat(cfg.FilePath); err == nil {
-		if st.IsDir() {
-			return nil, errors.New("file path is invalid")
+// WithConsole enables or disables console output
+func WithConsole(enable bool) Option {
+	return func(o *Options) {
+		o.EnableConsole = enable
+	}
+}
+
+// WithFile enables file output and sets the file configuration
+func WithFile(fileConfig *FileConfig) Option {
+	return func(o *Options) {
+		o.EnableFile = true
+		o.FileConfig = fileConfig
+	}
+}
+
+// WithColor enables or disables colored output
+func WithColor(enable bool) Option {
+	return func(o *Options) {
+		o.EnableColor = enable
+	}
+}
+
+// WithCaller enables or disables caller information
+func WithCaller(enable bool) Option {
+	return func(o *Options) {
+		o.EnableCaller = enable
+	}
+}
+
+// WithStacktrace enables or disables stack traces
+func WithStacktrace(enable bool) Option {
+	return func(o *Options) {
+		o.EnableStacktrace = enable
+	}
+}
+
+// FileConfigFromGlobal creates a FileConfig from global configuration
+func FileConfigFromGlobal() *FileConfig {
+	return &FileConfig{
+		SavePath:   config.GlobalConfig.Log.SavePath,
+		FileName:   config.GlobalConfig.Log.FileName,
+		MaxSize:    config.GlobalConfig.Log.MaxSize,
+		MaxAge:     config.GlobalConfig.Log.MaxAge,
+		LocalTime:  config.GlobalConfig.Log.LocalTime,
+		Compress:   config.GlobalConfig.Log.Compress,
+		MaxBackups: 1,
+	}
+}
+
+// New creates a new logger instance
+func New(opts ...Option) (*AppLogger, error) {
+	options := DefaultOptions()
+	for _, opt := range opts {
+		opt(options)
+	}
+
+	// Return error if file output is enabled but no file config is provided
+	if options.EnableFile && options.FileConfig == nil {
+		return nil, fmt.Errorf("file config is required when file output is enabled")
+	}
+
+	logger := &AppLogger{
+		options: options,
+	}
+
+	// Create core logging components
+	cores := logger.buildCores()
+	zapOptions := logger.buildZapOptions()
+
+	// Create zap logger
+	zapLogger := zap.New(zapcore.NewTee(cores...), zapOptions...)
+	logger.zap = zapLogger
+	logger.sugar = zapLogger.Sugar()
+
+	return logger, nil
+}
+
+// buildCores creates the logging output cores
+func (l *AppLogger) buildCores() []zapcore.Core {
+	cores := make([]zapcore.Core, 0)
+
+	// Add console output
+	if l.options.EnableConsole {
+		consoleEncoder := zapcore.NewConsoleEncoder(l.getEncoderConfig())
+		consoleCore := zapcore.NewCore(
+			consoleEncoder,
+			zapcore.AddSync(os.Stdout),
+			zap.NewAtomicLevelAt(l.options.Level),
+		)
+		cores = append(cores, consoleCore)
+	}
+
+	// Add file output
+	if l.options.EnableFile && l.options.FileConfig != nil {
+		fileEncoder := zapcore.NewJSONEncoder(l.getJSONEncoderConfig())
+
+		// Create a core that doesn't write directly to file, we'll use the hook for actual file output
+		fc := l.options.FileConfig
+		dateStr := time.Now().Format("2006-01-02")
+		fileNameWithDate := fmt.Sprintf("%s.log", dateStr)
+
+		lum := &lumberjack.Logger{
+			Filename:   filepath.Join(util.GetProjectRootPath(), fc.SavePath, fileNameWithDate), // fc.FileName
+			MaxSize:    fc.MaxSize,
+			MaxAge:     fc.MaxAge,
+			MaxBackups: fc.MaxBackups,
+			LocalTime:  fc.LocalTime,
+			Compress:   fc.Compress,
 		}
+
+		fileCore := zapcore.NewCore(
+			fileEncoder,
+			zapcore.AddSync(lum), // Temporary output to stdout, actual output handled by hook
+			zap.NewAtomicLevelAt(l.options.Level),
+		)
+		cores = append(cores, fileCore)
 	}
 
-	lumberJackLogger := &lumberjack.Logger{
-		Filename:   cfg.FilePath,
-		MaxSize:    cfg.MaxSize,
-		MaxBackups: cfg.MaxBackups,
-		MaxAge:     cfg.MaxAge,
-		Compress:   cfg.Compress,
-		LocalTime:  true,
-	}
-
-	if cfg.MaxSize == 0 {
-		lumberJackLogger.MaxSize = DefaultLogFileSizeInMB
-	}
-
-	return zapcore.AddSync(lumberJackLogger), nil
+	return cores
 }
 
-func getConsolLogSyncer() (zapcore.WriteSyncer, error) {
-	writer, _, err := zap.Open([]string{"stdout"}...)
-	if err != nil {
-		return nil, err
+// getJSONEncoderConfig gets the encoder configuration
+func (l *AppLogger) getJSONEncoderConfig() zapcore.EncoderConfig {
+	encoderConfig := zapcore.EncoderConfig{
+		TimeKey:        "time",
+		LevelKey:       "level",
+		NameKey:        "logger",
+		CallerKey:      "caller",
+		MessageKey:     "msg",
+		StacktraceKey:  "stacktrace",
+		LineEnding:     zapcore.DefaultLineEnding,
+		EncodeTime:     zapcore.ISO8601TimeEncoder,
+		EncodeLevel:    zapcore.CapitalLevelEncoder,
+		EncodeName:     zapcore.FullNameEncoder,
+		EncodeCaller:   zapcore.ShortCallerEncoder,
+		EncodeDuration: zapcore.SecondsDurationEncoder,
+	}
+	return encoderConfig
+}
+
+// getEncoderConfig gets the encoder configuration
+func (l *AppLogger) getEncoderConfig() zapcore.EncoderConfig {
+	customTimeEncoder := func(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
+		enc.AppendString("[" + t.Format("2006-01-02T15:04:05.000Z0700") + "]")
+	}
+	customLevelEncoder := func(level zapcore.Level, enc zapcore.PrimitiveArrayEncoder) {
+		enc.AppendString("[" + level.CapitalString() + "]")
+	}
+	customCallerEncoder := func(caller zapcore.EntryCaller, enc zapcore.PrimitiveArrayEncoder) {
+		enc.AppendString("[" + caller.TrimmedPath() + "]")
 	}
 
-	return writer, nil
+	encoderConfig := zapcore.EncoderConfig{
+		TimeKey:        "time",
+		LevelKey:       "level",
+		NameKey:        "logger",
+		CallerKey:      "caller",
+		MessageKey:     "msg",
+		StacktraceKey:  "stacktrace",
+		LineEnding:     zapcore.DefaultLineEnding,
+		EncodeTime:     customTimeEncoder,
+		EncodeLevel:    customLevelEncoder,
+		EncodeName:     zapcore.FullNameEncoder,
+		EncodeCaller:   customCallerEncoder,
+		EncodeDuration: zapcore.SecondsDurationEncoder,
+	}
+
+	if l.options.EnableColor {
+		encoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
+	}
+
+	return encoderConfig
+}
+
+// buildZapOptions builds zap options
+func (l *AppLogger) buildZapOptions() []zap.Option {
+	options := make([]zap.Option, 0)
+
+	if l.options.EnableCaller {
+		options = append(options, zap.AddCaller())
+	}
+
+	if l.options.EnableStacktrace {
+		options = append(options, zap.AddStacktrace(zap.ErrorLevel))
+	}
+
+	return options
+}
+
+// Zap returns the wrapped zap logger
+func (l *AppLogger) Zap() *zap.Logger {
+	return l.zap
+}
+
+// Sugar returns the wrapped sugared logger
+func (l *AppLogger) Sugar() *zap.SugaredLogger {
+	return l.sugar
+}
+
+// Sync synchronizes the log buffer
+func (l *AppLogger) Sync() error {
+	return l.zap.Sync()
+}
+
+// Close closes the logger and synchronizes the buffer
+func (l *AppLogger) Close() error {
+	return l.Sync()
+}
+
+// Init initializes the global logger instances (for compatibility with existing code)
+func Init() {
+	var opts []Option
+
+	// Determine log level from configuration
+	logLevel := zapcore.InfoLevel
+	if config.GlobalConfig.Log != nil && config.GlobalConfig.Log.Level != "" {
+		// Use configured log level if available
+		logLevel = ParseLogLevel(config.GlobalConfig.Log.Level)
+	} else if !config.GlobalConfig.Env.IsProd() {
+		// Fall back to debug level in non-production environments
+		logLevel = zapcore.DebugLevel
+	}
+	opts = append(opts, WithLevel(logLevel))
+
+	// Configure console output (defaults to true if not specified)
+	enableConsole := true
+	if config.GlobalConfig.Log != nil {
+		enableConsole = config.GlobalConfig.Log.EnableConsole
+	}
+	opts = append(opts, WithConsole(enableConsole))
+
+	// Configure colorized output (defaults to enabled in non-production)
+	enableColor := !config.GlobalConfig.Env.IsProd()
+	if config.GlobalConfig.Log != nil {
+		enableColor = config.GlobalConfig.Log.EnableColor
+	}
+	opts = append(opts, WithColor(enableColor))
+
+	// Configure caller information (defaults to true if not specified)
+	enableCaller := true
+	if config.GlobalConfig.Log != nil {
+		enableCaller = config.GlobalConfig.Log.EnableCaller
+	}
+	opts = append(opts, WithCaller(enableCaller))
+
+	// Configure stack traces (defaults to true if not specified)
+	enableStacktrace := true
+	if config.GlobalConfig.Log != nil {
+		enableStacktrace = config.GlobalConfig.Log.EnableStacktrace
+	}
+	opts = append(opts, WithStacktrace(enableStacktrace))
+
+	// Add file output if global config has log file settings
+	if config.GlobalConfig.Log != nil && config.GlobalConfig.Log.SavePath != "" {
+		opts = append(opts, WithFile(FileConfigFromGlobal()))
+	}
+
+	// Create new logger instance
+	logger, err := New(opts...)
+	if err != nil {
+		fmt.Printf("Failed to initialize logger: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Set global variables
+	Logger = logger.Zap()
+	SugaredLogger = logger.Sugar()
+
+	// Register deferred sync
+	// Direct Sync() call is commented out because it might cause errors on program shutdown
+	// defer Logger.Sync()
+}
+
+// DebugContext logs a debug message with context
+func (l *AppLogger) DebugContext(ctx *LogContext, msg string, fields ...zap.Field) {
+	if ctx != nil {
+		fields = append(ctx.ToFields(), fields...)
+	}
+	l.zap.Debug(msg, fields...)
+}
+
+// InfoContext logs an info message with context
+func (l *AppLogger) InfoContext(ctx *LogContext, msg string, fields ...zap.Field) {
+	if ctx != nil {
+		fields = append(ctx.ToFields(), fields...)
+	}
+	l.zap.Info(msg, fields...)
+}
+
+// WarnContext logs a warning message with context
+func (l *AppLogger) WarnContext(ctx *LogContext, msg string, fields ...zap.Field) {
+	if ctx != nil {
+		fields = append(ctx.ToFields(), fields...)
+	}
+	l.zap.Warn(msg, fields...)
+}
+
+// ErrorContext logs an error message with context
+func (l *AppLogger) ErrorContext(ctx *LogContext, msg string, fields ...zap.Field) {
+	if ctx != nil {
+		fields = append(ctx.ToFields(), fields...)
+	}
+	l.zap.Error(msg, fields...)
+}
+
+// DPanicContext logs a critical error message with context
+func (l *AppLogger) DPanicContext(ctx *LogContext, msg string, fields ...zap.Field) {
+	if ctx != nil {
+		fields = append(ctx.ToFields(), fields...)
+	}
+	l.zap.DPanic(msg, fields...)
+}
+
+// PanicContext logs a panic message with context and then panics
+func (l *AppLogger) PanicContext(ctx *LogContext, msg string, fields ...zap.Field) {
+	if ctx != nil {
+		fields = append(ctx.ToFields(), fields...)
+	}
+	l.zap.Panic(msg, fields...)
+}
+
+// FatalContext logs a fatal message with context and then exits
+func (l *AppLogger) FatalContext(ctx *LogContext, msg string, fields ...zap.Field) {
+	if ctx != nil {
+		fields = append(ctx.ToFields(), fields...)
+	}
+	l.zap.Fatal(msg, fields...)
+}
+
+// SugaredDebugContext logs a debug message with context using sugared logger
+func (l *AppLogger) SugaredDebugContext(ctx *LogContext, template string, args ...any) {
+	l.withSugaredContext(ctx).Debugf(template, args...)
+}
+
+// SugaredInfoContext logs an info message with context using sugared logger
+func (l *AppLogger) SugaredInfoContext(ctx *LogContext, template string, args ...any) {
+	l.withSugaredContext(ctx).Infof(template, args...)
+}
+
+// SugaredWarnContext logs a warning message with context using sugared logger
+func (l *AppLogger) SugaredWarnContext(ctx *LogContext, template string, args ...any) {
+	l.withSugaredContext(ctx).Warnf(template, args...)
+}
+
+// SugaredErrorContext logs an error message with context using sugared logger
+func (l *AppLogger) SugaredErrorContext(ctx *LogContext, template string, args ...any) {
+	l.withSugaredContext(ctx).Errorf(template, args...)
+}
+
+// withSugaredContext adds context fields to the sugared logger
+func (l *AppLogger) withSugaredContext(ctx *LogContext) *zap.SugaredLogger {
+	if ctx == nil {
+		return l.sugar
+	}
+	return l.zap.With(ctx.ToFields()...).Sugar()
 }

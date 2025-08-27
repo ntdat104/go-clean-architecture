@@ -45,8 +45,8 @@ func ZapLoggerWithBody() gin.HandlerFunc {
 		formattedEnd := end.Format("2006-01-02 15:04:05.000")
 
 		fields := []zap.Field{
-			zap.String("app_name", config.GetGlobalConfig().App.Name),
-			zap.String("app_version", config.GetGlobalConfig().App.Version),
+			zap.String("app_name", config.GlobalConfig.App.Name),
+			zap.String("app_version", config.GlobalConfig.App.Version),
 			zap.String("start_time", formattedStart),
 			zap.String("end_time", formattedEnd),
 			zap.String("method", c.Request.Method),
@@ -64,6 +64,6 @@ func ZapLoggerWithBody() gin.HandlerFunc {
 		}
 
 		// Write structured log
-		logger.Info("HTTP request", fields...)
+		logger.Logger.Info("HTTP request", fields...)
 	}
 }

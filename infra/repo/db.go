@@ -3,7 +3,7 @@ package repo
 import (
 	"database/sql"
 	"fmt"
-	"io/ioutil"
+	"os" // Replaced "io/ioutil" with "os"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -44,7 +44,8 @@ func NewDB(conf DatabaseConfig) (*sql.DB, error) {
 }
 
 func runSchema(db *sql.DB, schemaPath string) error {
-	schema, err := ioutil.ReadFile(schemaPath)
+	// Replaced ioutil.ReadFile with os.ReadFile
+	schema, err := os.ReadFile(schemaPath)
 	if err != nil {
 		return err
 	}
