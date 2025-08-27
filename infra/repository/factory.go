@@ -104,9 +104,9 @@ func NewMySQLConn() (*sqlx.DB, error) {
 }
 
 // NewRedisConn creates a new Redis client connection based on the Redis configuration
-func NewRedisConn() *redis.Client {
+func NewRedisConn() (*redis.Client, error) {
 	if config.GlobalConfig.Redis == nil {
-		return nil
+		return nil, ErrMissingRedisConfig
 	}
 
 	// Create Redis client from configuration
@@ -119,7 +119,7 @@ func NewRedisConn() *redis.Client {
 		IdleTimeout:  time.Duration(config.GlobalConfig.Redis.IdleTimeout) * time.Second,
 	})
 
-	return client
+	return client, nil
 }
 
 // NewPostgreConn creates a new PostgreSQL connection pool based on the PostgreSQL configuration

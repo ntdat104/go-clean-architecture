@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/ntdat104/go-clean-architecture/config"
 	"github.com/ntdat104/go-clean-architecture/infra/repo"
+	"github.com/ntdat104/go-clean-architecture/infra/repository"
 	"github.com/ntdat104/go-clean-architecture/internal/handler"
 	"github.com/ntdat104/go-clean-architecture/internal/middleware"
 	"github.com/ntdat104/go-clean-architecture/internal/service"
@@ -78,47 +79,14 @@ func main() {
 		Handler: router,
 	}
 
-	// sqliteDb, err := repository.NewSqliteConn()
-	// if err != nil {
-	// 	panic("Failed to initialize Sqlite: " + err.Error())
-	// }
+	client := repository.InitializeRepositories(
+		repository.WithMySQLite(),
+		repository.WithMySQL(),
+		repository.WithMyPostgreSQL(),
+		repository.WithRedis(),
+	)
 
-	// postgreDb, err := repository.NewPostgreConn()
-	// if err != nil {
-	// 	panic("Failed to initialize PostgreSQL: " + err.Error())
-	// }
-
-	// mysqlDb, err := repository.OpenGormDB()
-	// if err != nil {
-	// 	panic("Failed to initialize MySQL: " + err.Error())
-	// }
-
-	// redisClient := repository.NewRedisConn()
-
-	// conf := repo.DatabaseConfig{
-	// 	Driver:                  "mysql",
-	// 	Url:                     "user:pass@tcp(localhost:3306)/mydb?parseTime=true",
-	// 	SchemaPath:              "./schema/mysql_schema.sql",
-	// 	ConnMaxLifetimeInMinute: 10,
-	// 	MaxOpenConns:            10,
-	// 	MaxIdleConns:            5,
-	// }
-
-	conf := repo.DatabaseConfig{
-		Driver:                  "sqlite3",
-		Url:                     ":memory:", // or "./app.db"
-		SchemaPath:              "./schema/schema.sql",
-		ConnMaxLifetimeInMinute: 10,
-		MaxOpenConns:            10,
-		MaxIdleConns:            5,
-	}
-
-	db, err := repo.NewDB(conf)
-	if err != nil {
-		log.Fatalf("failed to new database err=%s\n", err.Error())
-	}
-
-	userRepo := repo.NewUserRepo(db)
+	userRepo := repo.NewUserRepo(client)
 	userService := service.NewUserService(userRepo)
 	handler.NewUserHandler(router, userService)
 

@@ -29,8 +29,8 @@ log:
 sqlite:
   dsn: file::memory:?cache=shared
 mysql:
-  user: root
-  password: root
+  user: user
+  password: pass
   host: 127.0.0.1
   port: 3306
   database: go_clean-architecture
@@ -50,8 +50,8 @@ redis:
   idleTimeout: 300
   minIdleConns: 5
 postgres:
-  user: postgres
-  password: postgres
+  user: user
+  password: pass
   host: 127.0.0.1
   port: 5432
   database: go_clean-architecture
