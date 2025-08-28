@@ -5,9 +5,9 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ntdat104/go-clean-architecture/internal/form/response"
-	"github.com/ntdat104/go-clean-architecture/internal/model"
-	"github.com/ntdat104/go-clean-architecture/internal/service"
+	"github.com/ntdat104/go-clean-architecture/application/response"
+	"github.com/ntdat104/go-clean-architecture/application/service"
+	"github.com/ntdat104/go-clean-architecture/domain/model"
 )
 
 type UserHandler interface {

@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/ntdat104/go-clean-architecture/internal/model"
-	"github.com/ntdat104/go-clean-architecture/internal/repo"
+	"github.com/ntdat104/go-clean-architecture/domain/model"
+	"github.com/ntdat104/go-clean-architecture/domain/repo"
 )
 
 var (

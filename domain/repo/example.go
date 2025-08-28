@@ -7,16 +7,16 @@ import (
 )
 
 // IExampleRepo defines the interface for example repository
-type IExampleRepo interface {
-	Create(ctx context.Context, tr Transaction, example *model.Example) (*model.Example, error)
-	Delete(ctx context.Context, tr Transaction, id int) error
-	Update(ctx context.Context, tr Transaction, entity *model.Example) error
-	GetByID(ctx context.Context, tr Transaction, Id int) (*model.Example, error)
-	FindByName(ctx context.Context, tr Transaction, name string) (*model.Example, error)
+type ExampleRepo interface {
+	Create(ctx context.Context, example *model.Example) (*model.Example, error)
+	Delete(ctx context.Context, id int) error
+	Update(ctx context.Context, entity *model.Example) error
+	GetByID(ctx context.Context, Id int) (*model.Example, error)
+	FindByName(ctx context.Context, name string) (*model.Example, error)
 }
 
 // IExampleCacheRepo defines the interface for example cache repository
-type IExampleCacheRepo interface {
+type ExampleCacheRepo interface {
 	HealthCheck(ctx context.Context) error
 	GetByID(ctx context.Context, id int) (*model.Example, error)
 	GetByName(ctx context.Context, name string) (*model.Example, error)

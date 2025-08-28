@@ -1,6 +1,10 @@
 package repository
 
 import (
+	"fmt"
+	"io/ioutil"
+	"log"
+
 	"github.com/go-redis/redis/v8"
 	"github.com/jmoiron/sqlx"
 )
@@ -45,6 +49,9 @@ func WithMySQL() RepositoryOption {
 			if err != nil {
 				panic("Failed to initialize MySQL: " + err.Error())
 			}
+			if err := RunMigration(mysql, "./schema/mysql.sql"); err != nil {
+				log.Fatalf("Migration failed: %v", err)
+			}
 			c.MySQL = mysql
 		}
 	}
@@ -74,4 +81,18 @@ func WithRedis() RepositoryOption {
 			c.Redis = redis
 		}
 	}
+}
+
+func RunMigration(db *sqlx.DB, schemaFile string) error {
+	sqlBytes, err := ioutil.ReadFile(schemaFile)
+	if err != nil {
+		return fmt.Errorf("failed to read schema file: %w", err)
+	}
+
+	// Execute the entire SQL file
+	_, err = db.Exec(string(sqlBytes))
+	if err != nil {
+		return fmt.Errorf("failed to execute migration: %w", err)
+	}
+	return nil
 }

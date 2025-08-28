@@ -7,7 +7,7 @@ services:
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: go_hexagonal
+      MYSQL_DATABASE: go_clean_architecture
       MYSQL_USER: user
       MYSQL_PASSWORD: pass
     ports:
@@ -23,7 +23,7 @@ services:
     environment:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: pass
-      POSTGRES_DB: go_hexagonal
+      POSTGRES_DB: go_clean_architecture
     ports:
       - "5432:5432"
     volumes:
@@ -44,7 +44,7 @@ services:
     container_name: gohex-mongo
     restart: always
     environment:
-      MONGO_INITDB_DATABASE: go_hexagonal
+      MONGO_INITDB_DATABASE: go_clean_architecture
     ports:
       - "27017:27017"
     volumes:

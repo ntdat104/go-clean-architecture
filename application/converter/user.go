@@ -1,8 +1,8 @@
 package converter
 
 import (
-	"github.com/ntdat104/go-clean-architecture/internal/dto"
-	"github.com/ntdat104/go-clean-architecture/internal/model"
+	"github.com/ntdat104/go-clean-architecture/application/dto"
+	"github.com/ntdat104/go-clean-architecture/domain/model"
 )
 
 func ConvertUserToUserDto(input *model.User) *dto.User {

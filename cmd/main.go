@@ -11,12 +11,12 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ntdat104/go-clean-architecture/application/handler"
+	"github.com/ntdat104/go-clean-architecture/application/middleware"
+	"github.com/ntdat104/go-clean-architecture/application/service"
 	"github.com/ntdat104/go-clean-architecture/config"
 	"github.com/ntdat104/go-clean-architecture/infra/repo"
 	"github.com/ntdat104/go-clean-architecture/infra/repository"
-	"github.com/ntdat104/go-clean-architecture/internal/handler"
-	"github.com/ntdat104/go-clean-architecture/internal/middleware"
-	"github.com/ntdat104/go-clean-architecture/internal/service"
 	"github.com/ntdat104/go-clean-architecture/pkg/logger"
 	"go.uber.org/zap"
 )
@@ -48,6 +48,13 @@ func main() {
 	middleware.InitializeMetrics()
 	logger.Logger.Info("Metrics collection system initialized")
 
+	client := repository.InitializeRepositories(
+		// repository.WithMySQLite(),
+		repository.WithMySQL(),
+		repository.WithMyPostgreSQL(),
+		repository.WithRedis(),
+	)
+
 	// Start metrics server in a separate goroutine if enabled
 	if config.GlobalConfig.MetricsServer != nil && config.GlobalConfig.MetricsServer.Enabled {
 		metricsAddr := config.GlobalConfig.MetricsServer.Addr
@@ -74,24 +81,17 @@ func main() {
 	router.Use(middleware.CorsMiddleware())
 	router.Use(middleware.ZapLoggerWithBody())
 
-	srv := &http.Server{
-		Addr:    config.GlobalConfig.HTTPServer.Addr,
-		Handler: router,
-	}
-
-	client := repository.InitializeRepositories(
-		repository.WithMySQLite(),
-		repository.WithMySQL(),
-		repository.WithMyPostgreSQL(),
-		repository.WithRedis(),
-	)
-
 	userRepo := repo.NewUserRepo(client)
 	userService := service.NewUserService(userRepo)
 	handler.NewUserHandler(router, userService)
 
 	systemService := service.NewSystemService()
 	handler.NewSystemHandler(router, systemService)
+
+	srv := &http.Server{
+		Addr:    config.GlobalConfig.HTTPServer.Addr,
+		Handler: router,
+	}
 
 	// Run server in a goroutine
 	go func() {

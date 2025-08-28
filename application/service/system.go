@@ -3,7 +3,7 @@ package service
 import (
 	"time"
 
-	"github.com/ntdat104/go-clean-architecture/internal/dto"
+	"github.com/ntdat104/go-clean-architecture/application/dto"
 )
 
 type SystemService interface {

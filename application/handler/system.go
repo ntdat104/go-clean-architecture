@@ -2,8 +2,8 @@ package handler
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/ntdat104/go-clean-architecture/internal/form/response"
-	"github.com/ntdat104/go-clean-architecture/internal/service"
+	"github.com/ntdat104/go-clean-architecture/application/response"
+	"github.com/ntdat104/go-clean-architecture/application/service"
 )
 
 type SystemHandler interface {

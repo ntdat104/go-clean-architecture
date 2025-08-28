@@ -1,8 +1,6 @@
 package repository
 
 import (
-	"context"
-	"database/sql"
 	"fmt"
 	"time"
 
@@ -13,47 +11,7 @@ import (
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
 
 	"github.com/ntdat104/go-clean-architecture/config"
-	"github.com/ntdat104/go-clean-architecture/domain/repo"
 )
-
-// TransactionFactoryImpl implements the repo.TransactionFactory interface
-type TransactionFactoryImpl struct {
-	// Map of store types to clients
-	clients map[StoreType]any
-}
-
-// NewTransactionFactory creates a new transaction factory with the provided clients
-func NewTransactionFactory(clients map[StoreType]any) repo.TransactionFactory {
-	return &TransactionFactoryImpl{
-		clients: clients,
-	}
-}
-
-// NewTransaction creates a new transaction for the specified store
-func (f *TransactionFactoryImpl) NewTransaction(ctx context.Context, store repo.StoreType, opts any) (repo.Transaction, error) {
-	// Convert domain StoreType to adapter StoreType
-	adapterStore := StoreType(store)
-
-	// Get the client for the store type
-	client, ok := f.clients[adapterStore]
-	if !ok {
-		return nil, fmt.Errorf("no client found for store type: %s", store)
-	}
-
-	// Convert options to SQL options if applicable
-	var sqlOpts *sql.TxOptions
-	if opt, ok := opts.(*sql.TxOptions); ok {
-		sqlOpts = opt
-	}
-
-	// Create transaction
-	tx, err := NewTransaction(ctx, adapterStore, client, sqlOpts)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create transaction: %w", err)
-	}
-
-	return tx, nil
-}
 
 // NewSqliteConn creates a new SQLite database connection based on the SQLite configuration.
 func NewSqliteConn() (*sqlx.DB, error) {

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ntdat104/go-clean-architecture/internal/util/metrics"
+	"github.com/ntdat104/go-clean-architecture/application/util/metrics"
 	"github.com/ntdat104/go-clean-architecture/pkg/logger"
 )
 

@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/lithammer/shortuuid/v4"
+	"github.com/ntdat104/go-clean-architecture/pkg/uuid"
 )
 
 type Meta struct {
@@ -25,7 +25,7 @@ type Response struct {
 func getMessageID(ctx *gin.Context) string {
 	messageID := ctx.GetHeader("X-Message-ID")
 	if messageID == "" {
-		messageID = shortuuid.New()
+		messageID = uuid.NewShortUUID()
 	}
 	return messageID
 }
