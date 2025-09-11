@@ -16,6 +16,8 @@ type Example struct {
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }
 
+func (e Example) TableName() string { return "example" }
+
 // NewExample creates a new Example entity with validation
 func NewExample(name, alias string) (*Example, error) {
 	if name == "" {

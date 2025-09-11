@@ -21,7 +21,7 @@ func TestSetupMySQLContainer(t *testing.T) {
 	assert.NotZero(t, config.Port, "Port should be greater than 0")
 	assert.Equal(t, "root", config.User)
 	assert.Equal(t, "mysqlroot", config.Password)
-	assert.Equal(t, "go_hexagonal", config.Database)
+	assert.Equal(t, "go_clean_architecture", config.Database)
 	assert.Equal(t, "utf8mb4", config.CharSet)
 	assert.Equal(t, true, config.ParseTime)
 	assert.Equal(t, "UTC", config.TimeZone)

@@ -46,7 +46,7 @@ func SetupPostgreSQLContainer(t *testing.T) *config.PostgreSQLConfig {
 		");\n\n" +
 		"CREATE INDEX idx_example_name ON example(name);\n" +
 		"CREATE INDEX idx_example_deleted_at ON example(deleted_at);\n" +
-		"COMMENT ON TABLE example IS 'Example table for Hexagonal Architecture';\n" +
+		"COMMENT ON TABLE example IS 'Example table for Clean Architecture';\n" +
 		"COMMENT ON COLUMN example.id IS 'Primary key ID';\n" +
 		"COMMENT ON COLUMN example.name IS 'Name';\n" +
 		"COMMENT ON COLUMN example.alias IS 'Alias';\n" +

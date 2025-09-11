@@ -46,7 +46,7 @@ func SetupMySQLContainer(t *testing.T) *config.MySQLConfig {
 		"    PRIMARY KEY (`id`),\n" +
 		"    KEY `idx_name` (`name`),\n" +
 		"    KEY `idx_deleted_at` (`deleted_at`)\n" +
-		") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Example table for Hexagonal Architecture';"
+		") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Example table for Clean Architecture';"
 
 	if _, err := tempFile.WriteString(initSQL); err != nil {
 		t.Fatalf("Failed to write to temp file: %v", err)
@@ -68,7 +68,7 @@ func SetupMySQLContainer(t *testing.T) *config.MySQLConfig {
 		ExposedPorts: []string{mysqlPort},
 		Env: map[string]string{
 			"MYSQL_ROOT_PASSWORD": "mysqlroot",
-			"MYSQL_DATABASE":      "go_hexagonal",
+			"MYSQL_DATABASE":      "go_clean_architecture",
 			"MYSQL_USER":          "user",
 			"MYSQL_PASSWORD":      "mysqlroot",
 		},
@@ -118,7 +118,7 @@ func SetupMySQLContainer(t *testing.T) *config.MySQLConfig {
 		Password:     "mysqlroot",
 		Host:         host,
 		Port:         port.Int(),
-		Database:     "go_hexagonal",
+		Database:     "go_clean_architecture",
 		MaxIdleConns: 10,
 		MaxOpenConns: 100,
 		MaxLifeTime:  "1h",

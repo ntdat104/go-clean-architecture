@@ -15,7 +15,6 @@ import (
 	"github.com/ntdat104/go-clean-architecture/application/middleware"
 	"github.com/ntdat104/go-clean-architecture/application/service"
 	"github.com/ntdat104/go-clean-architecture/config"
-	"github.com/ntdat104/go-clean-architecture/infra/repo"
 	"github.com/ntdat104/go-clean-architecture/infra/repository"
 	"github.com/ntdat104/go-clean-architecture/pkg/logger"
 	"go.uber.org/zap"
@@ -48,8 +47,8 @@ func main() {
 	middleware.InitializeMetrics()
 	logger.Logger.Info("Metrics collection system initialized")
 
-	client := repository.InitializeRepositories(
-		// repository.WithMySQLite(),
+	repository.InitializeRepositories(
+		repository.WithMySQLite(),
 		repository.WithMySQL(),
 		repository.WithMyPostgreSQL(),
 		repository.WithRedis(),
@@ -80,10 +79,6 @@ func main() {
 	router.Use(gin.Recovery())
 	router.Use(middleware.CorsMiddleware())
 	router.Use(middleware.ZapLoggerWithBody())
-
-	userRepo := repo.NewUserRepo(client)
-	userService := service.NewUserService(userRepo)
-	handler.NewUserHandler(router, userService)
 
 	systemService := service.NewSystemService()
 	handler.NewSystemHandler(router, systemService)

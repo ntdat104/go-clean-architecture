@@ -3,7 +3,7 @@ version: "3.9"
 services:
   mysql:
     image: mysql:8.0
-    container_name: gohex-mysql
+    container_name: go-clean-architecture-mysql
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: root
@@ -18,7 +18,7 @@ services:
 
   postgres:
     image: postgres:15
-    container_name: gohex-postgres
+    container_name: go-clean-architecture-postgres
     restart: always
     environment:
       POSTGRES_USER: user
@@ -31,7 +31,7 @@ services:
 
   redis:
     image: redis:7
-    container_name: gohex-redis
+    container_name: go-clean-architecture-redis
     restart: always
     command: ["redis-server", "--appendonly", "yes"]
     ports:
@@ -41,7 +41,7 @@ services:
 
   mongo:
     image: mongo:6
-    container_name: gohex-mongo
+    container_name: go-clean-architecture-mongo
     restart: always
     environment:
       MONGO_INITDB_DATABASE: go_clean_architecture
