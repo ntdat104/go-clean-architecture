@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	httpmiddleware "github.com/ntdat104/go-clean-architecture/api/http/middleware"
 	"github.com/ntdat104/go-clean-architecture/api/middleware"
 	"github.com/ntdat104/go-clean-architecture/application/handler"
 	"github.com/ntdat104/go-clean-architecture/application/service"
@@ -77,8 +78,8 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 	router.Use(gin.Recovery())
-	router.Use(middleware.CorsMiddleware())
-	router.Use(middleware.ZapLoggerWithBody())
+	router.Use(httpmiddleware.Cors())
+	router.Use(httpmiddleware.ZapLoggerWithBody())
 
 	systemService := service.NewSystemService()
 	handler.NewSystemHandler(router, systemService)
