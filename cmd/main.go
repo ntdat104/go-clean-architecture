@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/ntdat104/go-clean-architecture/api/middleware"
 	"github.com/ntdat104/go-clean-architecture/application/handler"
-	"github.com/ntdat104/go-clean-architecture/application/middleware"
 	"github.com/ntdat104/go-clean-architecture/application/service"
 	"github.com/ntdat104/go-clean-architecture/config"
 	"github.com/ntdat104/go-clean-architecture/infra/repository"

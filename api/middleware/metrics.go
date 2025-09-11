@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/ntdat104/go-clean-architecture/application/util/metrics"
 	"github.com/ntdat104/go-clean-architecture/pkg/logger"
+	"github.com/ntdat104/go-clean-architecture/pkg/metrics"
 )
 
 // MetricsResponseWriter is a wrapper around http.ResponseWriter that tracks the status code
