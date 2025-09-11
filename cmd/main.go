@@ -2,58 +2,54 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
-	"github.com/gin-gonic/gin"
-	httpmiddleware "github.com/ntdat104/go-clean-architecture/api/http/middleware"
 	"github.com/ntdat104/go-clean-architecture/api/middleware"
-	"github.com/ntdat104/go-clean-architecture/application/handler"
-	"github.com/ntdat104/go-clean-architecture/application/service"
 	"github.com/ntdat104/go-clean-architecture/config"
 	"github.com/ntdat104/go-clean-architecture/infra/repository"
 	"github.com/ntdat104/go-clean-architecture/pkg/logger"
 	"go.uber.org/zap"
+
+	http2 "github.com/ntdat104/go-clean-architecture/api/http"
 )
 
-const ServiceName = "go-clean-architecture"
-
-// Constants for application settings
 const (
-	// DefaultShutdownTimeout is the default timeout for graceful shutdown
-	DefaultShutdownTimeout = 5 * time.Second
-	// DefaultMetricsAddr is the default address for the metrics server
 	DefaultMetricsAddr = ":9090"
 )
 
 func main() {
-	fmt.Println("Starting " + ServiceName)
-
 	// Initialize configuration
 	config.Init("./config", "config")
-	fmt.Println("Configuration initialized")
 
 	// Initialize logging
 	logger.Init()
 	logger.Logger.Info("Application starting",
-		zap.String("service", ServiceName),
+		zap.String("service", config.GlobalConfig.App.Name),
 		zap.String("env", string(config.GlobalConfig.Env)))
 
 	// Initialize metrics collection system
 	middleware.InitializeMetrics()
 	logger.Logger.Info("Metrics collection system initialized")
 
-	repository.InitializeRepositories(
-		repository.WithMySQLite(),
-		repository.WithMySQL(),
-		repository.WithMyPostgreSQL(),
-		repository.WithRedis(),
-	)
+	// Initializing mysql
+	db, err := repository.NewMySQLConn()
+	if err != nil {
+		logger.Logger.Fatal("Failed to initialize mysql",
+			zap.Error(err))
+	}
+	logger.Logger.Info("Mysql initialized successfully")
+
+	// Initializing redis
+	rdb, err := repository.NewRedisConn()
+	if err != nil {
+		logger.Logger.Fatal("Failed to initialize redis",
+			zap.Error(err))
+	}
+	logger.Logger.Info("Redis initialized successfully")
 
 	// Start metrics server in a separate goroutine if enabled
 	if config.GlobalConfig.MetricsServer != nil && config.GlobalConfig.MetricsServer.Enabled {
@@ -75,14 +71,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	gin.SetMode(gin.ReleaseMode)
-	router := gin.New()
-	router.Use(gin.Recovery())
-	router.Use(httpmiddleware.Cors())
-	router.Use(httpmiddleware.ZapLoggerWithBody())
-
-	systemService := service.NewSystemService()
-	handler.NewSystemHandler(router, systemService)
+	router := http2.NewServerRoute(db, rdb)
 
 	srv := &http.Server{
 		Addr:    config.GlobalConfig.HTTPServer.Addr,

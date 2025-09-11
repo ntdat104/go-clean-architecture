@@ -111,7 +111,6 @@ func MetricsMiddleware(handlerName string) func(http.Handler) http.Handler {
 // InitializeMetrics initializes the metrics collection system
 func InitializeMetrics() {
 	metrics.Init()
-	logger.SugaredLogger.Info("Metrics collection system initialized")
 }
 
 // StartMetricsServer starts the metrics server
