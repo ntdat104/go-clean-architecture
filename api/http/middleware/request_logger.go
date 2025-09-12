@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"time"
 
+	glbConfig "github.com/ntdat104/go-clean-architecture/config"
+
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
@@ -52,8 +54,8 @@ type LoggingConfig struct {
 // DefaultLoggingConfig returns the default logging configuration
 func DefaultLoggingConfig() *LoggingConfig {
 	return &LoggingConfig{
-		LogRequestBody:  false,
-		LogResponseBody: false,
+		LogRequestBody:  true,
+		LogResponseBody: true,
 		MaxBodyLogSize:  1024, // 1 KB
 		SkipPaths:       []string{"/ping", "/health"},
 	}
@@ -113,7 +115,10 @@ func RequestLoggerWithConfig(config *LoggingConfig) gin.HandlerFunc {
 		c.Next()
 
 		// Calculate request duration
+		end := time.Now()
 		duration := time.Since(start)
+		formattedStart := start.Format("2006-01-02 15:04:05.000")
+		formattedEnd := end.Format("2006-01-02 15:04:05.000")
 
 		// Check if request path is an API path
 		isAPIPath := len(c.Errors) == 0 && c.Writer.Status() < 500
@@ -130,15 +135,39 @@ func RequestLoggerWithConfig(config *LoggingConfig) gin.HandlerFunc {
 
 		// Create log fields
 		fields := []zap.Field{
+			zap.String("request_id", requestID),
 			zap.String("method", c.Request.Method),
 			zap.String("path", c.Request.URL.Path),
 			zap.String("query", c.Request.URL.RawQuery),
-			zap.String("ip", c.ClientIP()),
-			zap.String("user-agent", c.Request.UserAgent()),
 			zap.Int("status", responseWriter.Status()),
 			zap.String("latency", duration.String()),
 			zap.Int64("latency_ms", duration.Milliseconds()),
-			zap.String("request_id", requestID),
+			zap.String("ip", c.ClientIP()),
+			zap.String("user-agent", c.Request.UserAgent()),
+			zap.String("app_name", glbConfig.GlobalConfig.App.Name),
+			zap.String("app_version", glbConfig.GlobalConfig.App.Version),
+			zap.String("start_time", formattedStart),
+			zap.String("end_time", formattedEnd),
+		}
+
+		// Add x_api_key header if present
+		if apiKey := c.GetHeader("X-Api-Key"); apiKey != "" {
+			fields = append(fields, zap.String("x_api_key", apiKey))
+		}
+
+		// Add x_api_secret header if present
+		if apiSecret := c.GetHeader("X-Api-Secret"); apiSecret != "" {
+			fields = append(fields, zap.String("x_api_secret", apiSecret))
+		}
+
+		// Add authorization header if present
+		if auth := c.GetHeader("Authorization"); auth != "" {
+			fields = append(fields, zap.String("authorization", auth))
+		}
+
+		// Add signature header if present
+		if signature := c.GetHeader("Signature"); signature != "" {
+			fields = append(fields, zap.String("signature", signature))
 		}
 
 		// Add request body if enabled and present

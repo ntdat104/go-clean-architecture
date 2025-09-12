@@ -18,7 +18,7 @@ var codes = map[int]string{}
 
 // Basic error code
 const (
-	SuccessCode = 0
+	SuccessCode = 20000
 
 	ServerErrorCode     = 10000
 	InvalidParamsCode   = 10001

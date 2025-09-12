@@ -12,8 +12,8 @@ import (
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
 
-	"github.com/ntdat104/go-clean-architecture/application/util"
 	"github.com/ntdat104/go-clean-architecture/config"
+	"github.com/ntdat104/go-clean-architecture/util"
 )
 
 // Global logger instances, maintained for compatibility with existing code

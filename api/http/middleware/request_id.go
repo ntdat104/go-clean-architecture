@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
+	"github.com/ntdat104/go-clean-architecture/pkg/uuid"
 )
 
 const (
@@ -16,7 +16,7 @@ func RequestID() gin.HandlerFunc {
 		// Get request ID from header or generate a new one
 		requestID := c.GetHeader(RequestIDHeader)
 		if requestID == "" {
-			requestID = uuid.New().String()
+			requestID = uuid.NewGoogleUUID()
 		}
 
 		// Set request ID to header

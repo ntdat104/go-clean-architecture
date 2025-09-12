@@ -1,8 +1,8 @@
-package handler
+package http
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/ntdat104/go-clean-architecture/application/response"
+	"github.com/ntdat104/go-clean-architecture/api/http/handle"
 	"github.com/ntdat104/go-clean-architecture/application/service"
 )
 
@@ -31,5 +31,6 @@ func (h *systemHandler) initRoutes() {
 }
 
 func (h *systemHandler) GetTime(ctx *gin.Context) {
-	response.Success(ctx, h.systemService.GetTime())
+	response := handle.NewResponse(ctx)
+	response.ToResponse(h.systemService.GetTime())
 }

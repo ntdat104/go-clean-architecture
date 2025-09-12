@@ -45,6 +45,7 @@ func ZapLoggerWithBody() gin.HandlerFunc {
 		formattedEnd := end.Format("2006-01-02 15:04:05.000")
 
 		fields := []zap.Field{
+			zap.String("request_id", c.GetHeader(RequestIDHeader)),
 			zap.String("app_name", config.GlobalConfig.App.Name),
 			zap.String("app_version", config.GlobalConfig.App.Version),
 			zap.String("start_time", formattedStart),

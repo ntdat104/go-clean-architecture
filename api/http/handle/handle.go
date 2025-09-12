@@ -4,10 +4,11 @@ import (
 	"net/http"
 	"reflect"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/ntdat104/go-clean-architecture/api/dto"
 	"github.com/ntdat104/go-clean-architecture/api/error_code"
+	"github.com/ntdat104/go-clean-architecture/api/http/middleware"
 	"github.com/ntdat104/go-clean-architecture/api/http/paginate"
 	"github.com/ntdat104/go-clean-architecture/pkg/logger"
 )
@@ -16,79 +17,120 @@ type Response struct {
 	Ctx *gin.Context
 }
 
+type Meta struct {
+	RequestID string `json:"request_id"`
+	Timestamp int64  `json:"timestamp"`
+	Datetime  string `json:"datetime"`
+	Code      int    `json:"code"`
+	Message   string `json:"message"`
+	Token     string `json:"token,omitempty"`
+	Total     int    `json:"total,omitempty"`
+	Page      int    `json:"page,omitempty"`
+	PageSize  int    `json:"page_size,omitempty"`
+	DocRef    string `json:"doc_ref,omitempty"`
+}
+
 // StandardResponse defines the standard API response structure
 type StandardResponse struct {
-	Code    int         `json:"code"`              // Status code
-	Message string      `json:"message"`           // Response message
-	Data    interface{} `json:"data,omitempty"`    // Response data
-	DocRef  string      `json:"doc_ref,omitempty"` // Documentation reference
+	Meta   Meta     `json:"meta"`
+	Data   any      `json:"data,omitempty"`
+	Errors []string `json:"errors,omitempty"`
 }
 
 func NewResponse(ctx *gin.Context) *Response {
 	return &Response{Ctx: ctx}
 }
 
-func (r *Response) ToResponse(data interface{}) {
-	if data == nil {
-		data = gin.H{}
-	}
+func (r *Response) ToSuccess() {
+	now := time.Now()
 	r.Ctx.JSON(http.StatusOK, StandardResponse{
-		Code:    0,
-		Message: "success",
-		Data:    data,
-	})
-}
-
-func (r *Response) ToResponseList(list interface{}, totalRows int) {
-	r.Ctx.JSON(http.StatusOK, StandardResponse{
-		Code:    0,
-		Message: "success",
-		Data: gin.H{
-			"list": list,
-			"pager": dto.Pager{
-				Page:      paginate.GetPage(r.Ctx),
-				PageSize:  paginate.GetPageSize(r.Ctx),
-				TotalRows: totalRows,
-			},
+		Meta: Meta{
+			RequestID: r.Ctx.GetString(middleware.RequestIDHeader),
+			Timestamp: now.UnixMilli(),
+			Datetime:  now.Format("2006-01-02 15:04:05"),
+			Code:      error_code.SuccessCode,
+			Message:   "success",
 		},
 	})
 }
 
+func (r *Response) ToResponse(data interface{}) {
+	now := time.Now()
+	r.Ctx.JSON(http.StatusOK, StandardResponse{
+		Meta: Meta{
+			RequestID: r.Ctx.GetString(middleware.RequestIDHeader),
+			Timestamp: now.UnixMilli(),
+			Datetime:  now.Format("2006-01-02 15:04:05"),
+			Code:      error_code.SuccessCode,
+			Message:   "success",
+		},
+		Data: data,
+	})
+}
+
+func (r *Response) ToResponseList(data interface{}, totalRows int) {
+	now := time.Now()
+	r.Ctx.JSON(http.StatusOK, StandardResponse{
+		Meta: Meta{
+			RequestID: r.Ctx.GetString(middleware.RequestIDHeader),
+			Timestamp: now.UnixMilli(),
+			Datetime:  now.Format("2006-01-02 15:04:05"),
+			Code:      error_code.SuccessCode,
+			Message:   "success",
+			Page:      paginate.GetPage(r.Ctx),
+			PageSize:  paginate.GetPageSize(r.Ctx),
+			Total:     totalRows,
+		},
+		Data: data,
+	})
+}
+
 func (r *Response) ToErrorResponse(err *error_code.Error) {
-	response := StandardResponse{
-		Code:    err.Code,
-		Message: err.Msg,
-	}
-
-	if len(err.Details) > 0 {
-		response.Data = gin.H{"details": err.Details}
-	}
-
-	if err.DocRef != "" {
-		response.DocRef = err.DocRef
-	}
-
-	r.Ctx.JSON(err.StatusCode(), response)
+	now := time.Now()
+	r.Ctx.JSON(err.StatusCode(), StandardResponse{
+		Meta: Meta{
+			RequestID: r.Ctx.GetString(middleware.RequestIDHeader),
+			Timestamp: now.UnixMilli(),
+			Datetime:  now.Format("2006-01-02 15:04:05"),
+			Code:      err.Code,
+			Message:   err.Msg,
+			DocRef:    err.DocRef,
+		},
+		Errors: err.Details,
+	})
 }
 
 // Success returns a success response
 func Success(c *gin.Context, data any) {
+	now := time.Now()
 	c.JSON(http.StatusOK, StandardResponse{
-		Code:    0,
-		Message: "success",
-		Data:    data,
+		Meta: Meta{
+			RequestID: c.GetString(middleware.RequestIDHeader),
+			Timestamp: now.UnixMilli(),
+			Datetime:  now.Format("2006-01-02 15:04:05"),
+			Code:      error_code.SuccessCode,
+			Message:   "success",
+		},
+		Data: data,
 	})
 }
 
 // Error unified error handling
 func Error(c *gin.Context, err error) {
+	now := time.Now()
+
 	// Handle API error codes
 	if apiErr, ok := err.(*error_code.Error); ok {
 		c.JSON(apiErr.StatusCode(), StandardResponse{
-			Code:    apiErr.Code,
-			Message: apiErr.Msg,
-			Data:    gin.H{"details": apiErr.Details},
-			DocRef:  apiErr.DocRef,
+			Meta: Meta{
+				RequestID: c.GetString(middleware.RequestIDHeader),
+				Timestamp: now.UnixMilli(),
+				Datetime:  now.Format("2006-01-02 15:04:05"),
+				Code:      apiErr.Code,
+				Message:   apiErr.Msg,
+				DocRef:    apiErr.DocRef,
+			},
+			Errors: apiErr.Details,
 		})
 		return
 	}
@@ -98,8 +140,13 @@ func Error(c *gin.Context, err error) {
 
 	// Default error response
 	c.JSON(http.StatusInternalServerError, StandardResponse{
-		Code:    error_code.ServerErrorCode,
-		Message: "Internal server error",
+		Meta: Meta{
+			RequestID: c.GetString(middleware.RequestIDHeader),
+			Timestamp: now.UnixMilli(),
+			Datetime:  now.Format("2006-01-02 15:04:05"),
+			Code:      error_code.ServerErrorCode,
+			Message:   "Internal server error",
+		},
 	})
 }
 
