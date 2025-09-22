@@ -22,5 +22,10 @@ func Get(c *gin.Context) *AppContext {
 		c.JSON(500, gin.H{"error": "app_context not found in gin.Context — did you forget the middleware?"})
 		return nil
 	}
-	return val.(*AppContext)
+	value, ok := val.(*AppContext)
+	if !ok {
+		c.JSON(500, gin.H{"error": "app_context has wrong type in gin.Context"})
+		return nil
+	}
+	return value
 }
