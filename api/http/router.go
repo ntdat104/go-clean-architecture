@@ -10,6 +10,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/go-redis/redis/v8"
 	"github.com/jmoiron/sqlx"
+	"github.com/ntdat104/go-clean-architecture/api/http/app_context"
 	"github.com/ntdat104/go-clean-architecture/api/http/validator/custom"
 	"github.com/ntdat104/go-clean-architecture/application/service"
 	"github.com/ntdat104/go-clean-architecture/config"
@@ -33,8 +34,9 @@ func NewServerRoute(db *sqlx.DB, rdb *redis.Client) *gin.Engine {
 
 	// Apply middleware
 	router.Use(gin.Recovery())
-	router.Use(httpMiddleware.RequestID()) // Add request ID middleware
 	router.Use(httpMiddleware.Cors())
+	router.Use(httpMiddleware.RequestID())              // Add request ID middleware
+	router.Use(httpMiddleware.AppContextMiddleware())   // Add app context middleware
 	router.Use(httpMiddleware.RequestLogger())          // Add request logging middleware
 	router.Use(httpMiddleware.ErrorHandlerMiddleware()) // Add unified error handling middleware
 	// router.Use(httpMiddleware.ZapLoggerWithBody())
@@ -63,6 +65,7 @@ func NewServerRoute(db *sqlx.DB, rdb *redis.Client) *gin.Engine {
 
 	// Health check
 	router.GET("/ping", func(c *gin.Context) {
+		app_context.Get(c).Logger.Info("Ping request received")
 		c.String(http.StatusOK, "pong")
 	})
 
